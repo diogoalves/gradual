@@ -63,11 +63,13 @@ class Value:
   
   def tanh(self):
     e2x = math.e ** (2 * self.data)
-    out = Value( (e2x - 1)/(e2x + 1), (self,), 'ReLU')
+    out = Value( (e2x - 1)/(e2x + 1), (self,), 'Tanh')
 
     def _backward():
       self.grad += (1 - out.data**2) * out.grad
     out._backward = _backward
+
+    return out
 
   # composite operator functions
   def __neg__(self): return self * -1
@@ -169,6 +171,15 @@ class Tensor:
     def _backward():
       self.grad += (out.data > 0) *  out.grad
     out._backward = _backward
+
+    return out
+  
+  def tanh(self):
+    out = Tensor(np.tanh(self.data), (self,), 'Tanh')
+
+    def _backward():
+      out.grad += (1 - (out.data ** 2)) * out.grad
+    out.backward = _backward
 
     return out
 
