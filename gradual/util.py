@@ -26,14 +26,9 @@ def draw_dot(root, format='svg', rankdir='LR'):
         if isinstance(n, Value):
             data = f'{n.data:.4f}'
             grad = f'{n.grad:.4f}'
-        elif isinstance(n, Tensor):
+        else:
             data = np.array2string(n.data, precision=4, separator=",")
             grad = np.array2string(n.grad, precision=4, separator=",")
-        else:
-            print(n)
-            print(type(n))
-            data = 'Unknow'
-            grad = 'Unknow'
         node_label = f'{{ {n.label} | data {data} | grad {grad} }}'
         dot.node(name=str(id(n)), label = node_label, shape='record')
         if n._op:

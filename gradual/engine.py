@@ -70,6 +70,15 @@ class Value:
     out._backward = _backward
 
     return out
+  
+  def exp(self):
+    out = Value( math.exp(self.data), (self,), 'Exp')
+
+    def _backward():
+      self.grad += out.data * out.grad
+    out._backward = _backward
+
+    return out
 
   # composite operator functions
   def __neg__(self): return self * -1
@@ -111,10 +120,11 @@ class Tensor:
       Tensor class used to define an auto-diff expression graph.
   '''
 
-  def __init__(self, data, _children=(), _op=(), label=''):
-    self.data = np.array(data)
+  def __init__(self, data, _children=(), _op=(), label='', dtype=np.single):
+    self.data = np.array(data, dtype=dtype)
     self.grad = np.zeros(self.data.shape)
     self.label = label
+    self.dtype = dtype
 
     self._backward = lambda: None
     self._prev = set(_children)
@@ -123,10 +133,10 @@ class Tensor:
   def __add__(self, other):
     if not isinstance(other, Tensor):
       if isinstance(other, (int, float)):
-        other = Tensor([other])
+        other = Tensor([other], dtype=self.dtype)
       else:
-        other = Tensor(other)
-    out = Tensor(self.data + other.data, (self, other), '+')
+        other = Tensor(other, dtype=self.dtype)
+    out = Tensor(self.data + other.data, (self, other), '+', dtype=self.dtype)
 
     def _backward():
       self.grad += out.grad
@@ -138,10 +148,10 @@ class Tensor:
   def __mul__(self, other):
     if not isinstance(other, Tensor):
       if isinstance(other, (int, float)):
-        other = Tensor([other])
+        other = Tensor([other], dtype=self.dtype)
       else:
-        other = Tensor(other)
-    out = Tensor(self.data * other.data, (self, other), '*')
+        other = Tensor(other, dtype=self.dtype)
+    out = Tensor(self.data * other.data, (self, other), '*', dtype=self.dtype)
 
     def _backward():
       self.grad += other.data * out.grad
@@ -151,8 +161,8 @@ class Tensor:
     return out
 
   def __pow__(self, other):
-    other = other if isinstance(other, Tensor) else Tensor(other)
-    out = Tensor(self.data ** other.data, (self,), f'**{other}')
+    other = other if isinstance(other, Tensor) else Tensor(other, dtype=self.dtype)
+    out = Tensor(self.data ** other.data, (self,), f'**{other}', dtype=self.dtype)
 
     def _backward():
       self.grad += ((other.data * (self.data ** (other.data) ))/ self.data) * out.grad
@@ -166,7 +176,7 @@ class Tensor:
     return out
 
   def relu(self):
-    out = Tensor(np.maximum(0, self.data), (self,), 'ReLU')
+    out = Tensor(np.maximum(0, self.data), (self,), 'ReLU', dtype=self.dtype)
 
     def _backward():
       self.grad += (out.data > 0) *  out.grad
@@ -175,13 +185,32 @@ class Tensor:
     return out
   
   def tanh(self):
-    out = Tensor(np.tanh(self.data), (self,), 'Tanh')
+    out = Tensor(np.tanh(self.data), (self,), 'Tanh', dtype=self.dtype)
 
     def _backward():
-      out.grad += (1 - (out.data ** 2)) * out.grad
-    out.backward = _backward
+      self.grad += (1 - (out.data ** 2)) * out.grad
+    out._backward = _backward
 
     return out
+
+  def exp(self):
+    out = Tensor( np.exp(self.data), (self,), 'Exp', dtype=self.dtype)
+
+    def _backward():
+      self.grad += out.data * out.grad
+    out._backward = _backward
+
+    return out
+
+  def sum(self):
+    out = Tensor([np.sum(self.data)], (self,), 'Sum', dtype=self.dtype)
+
+    def _backward():
+      self.grad += out.grad
+    out._backward = _backward
+
+    return out
+      
 
   # composite operator functions
   def __neg__(self): return self * [-1]
@@ -189,9 +218,9 @@ class Tensor:
   def __truediv__(self, other):
     if not isinstance(other, Tensor):
       if isinstance(other, (int, float)):
-        other = Tensor([other])
+        other = Tensor([other], dtype=self.dtype)
       else:
-        other = Tensor(other)
+        other = Tensor(other, dtype=self.dtype)
     return self * (other ** -1)
 
   # reverse operator functions
@@ -200,7 +229,7 @@ class Tensor:
   def __rmul__(self, other): return self * other # other * self
   def __rtruediv__(self, other): return other * (self ** [- 1]) # other / self
 
-  def __repr__(self): return f'Value(data={self.data}, grad={self.grad}, label={self.label})'
+  def __repr__(self): return f'Tensor(data={self.data}, grad={self.grad}, label={self.label} dtype={self.dtype})'
 
   def backward(self):
     # topological order all of the children in the graph
@@ -215,6 +244,6 @@ class Tensor:
     build_topo(self)
 
     # go one variable at a time and apply the chain rule to get its gradient
-    self.grad = np.ones(self.data.shape)
+    self.grad = np.ones(1)
     for v in reversed(topo):
-      v._backward()    
+      v._backward()
